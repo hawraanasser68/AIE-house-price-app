@@ -14,5 +14,6 @@ COPY . .
 # Expose ports for FastAPI and Streamlit
 EXPOSE 8000 8501
 
-# Command to run both (using a script)
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000 & streamlit run streamlit_app.py --server.port 8501 --server.address 0.0.0.0 & wait"]
+# Command to run both services
+# Railway will expose the service on $PORT, so Streamlit must use that port.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000 & streamlit run streamlit_app.py --server.port $PORT --server.address 0.0.0.0 & wait"]
