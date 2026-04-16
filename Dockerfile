@@ -1,8 +1,8 @@
 # Use Python 3.11
 FROM python:3.11-slim
 
-# Set working directory
-WORKDIR /app
+# Set working directory to the root folder where the code is
+WORKDIR /app/root
 
 # Copy requirements and install
 COPY requirements.txt .
