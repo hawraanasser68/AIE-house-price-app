@@ -1,15 +1,15 @@
 # Use Python 3.11
 FROM python:3.11-slim
 
-# Set working directory to the root folder where the code is
-WORKDIR /app/root
+# Set working directory
+WORKDIR /app
 
 # Copy requirements and install
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the entire project
-COPY . .
+# Copy the root folder contents to /app
+COPY root .
 
 # Expose ports for FastAPI and Streamlit
 EXPOSE 8000 8501
