@@ -362,4 +362,4 @@ if st.session_state.features is not None:
     if st.session_state.analysis:
         with st.container(border=True):
             st.subheader("🏡 Analysis")
-            st.write(st.session_state.analysis)
+            st.markdown(st.session_state.analysis.replace("$", r"\$"))
