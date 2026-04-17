@@ -1,7 +1,17 @@
 import streamlit as st
 import requests
 
+st.set_page_config(page_title="House Price Predictor", page_icon="🏠", layout="wide")
+
 st.title("🏠 House Price Prediction")
+st.caption("Describe a house, complete missing details, then get a price estimate and AI analysis.")
+
+with st.sidebar:
+    st.header("How to use")
+    st.markdown("1. Describe the house")
+    st.markdown("2. Fill missing details")
+    st.markdown("3. Click Predict")
+    st.divider()
 
 # ------------------------
 # CONFIG
@@ -118,19 +128,39 @@ if "missing" not in st.session_state:
 if "filled" not in st.session_state:
     st.session_state.filled = {}
 
+if "prediction" not in st.session_state:
+    st.session_state.prediction = None
+
+if "analysis" not in st.session_state:
+    st.session_state.analysis = None
+
 # ------------------------
 # STEP 1: INPUT
 # ------------------------
-query = st.text_area("Describe the house")
+with st.container(border=True):
+    st.subheader("Step 1: Describe the house")
+    with st.form("extract_form"):
+        query = st.text_area(
+            "House description",
+            placeholder="Example: A house in NAmes, quality 7, 1500 sq ft, 2 garage cars, built in 2005...",
+            height=130,
+        )
+        submit_extract = st.form_submit_button("Extract Features", use_container_width=True)
 
-if st.button("Submit"):
+if submit_extract:
     if not query.strip():
         st.error("Please describe the house you want.")
     else:
-        res = requests.post(
-            "http://127.0.0.1:8000/extract",
-            json={"query": query}
-        )
+        try:
+            with st.spinner("Extracting features..."):
+                res = requests.post(
+                    "http://127.0.0.1:8000/extract",
+                    json={"query": query},
+                    timeout=25,
+                )
+        except requests.RequestException:
+            st.error("Could not connect to backend. Start FastAPI on port 8000.")
+            st.stop()
 
         if res.status_code != 200:
             st.error("Failed to extract features. Please try again.")
@@ -139,7 +169,7 @@ if st.button("Submit"):
         data = res.json()
 
         if "error" in data:
-            st.warning("Gemini is currently unavailable. Please fill in all house details manually.")
+            st.warning("LLM extraction is currently unavailable. Please fill in all house details manually.")
             # Fallback: assume all features are missing
             data = {feature: None for feature in ALL_FEATURES}
             data["missing_features"] = ALL_FEATURES.copy()
@@ -150,53 +180,100 @@ if st.button("Submit"):
             if st.session_state.features.get(k) is None
         ]
         st.session_state.filled = {}
+        st.session_state.prediction = None
+        st.session_state.analysis = None
 
 # ------------------------
 # STEP 2: SHOW ONLY MISSING
 # ------------------------
 if st.session_state.features is not None:
-    st.subheader("Extracted features")
-    st.json(st.session_state.features)
-
     missing = st.session_state.missing
 
+    extracted_count = len([k for k in ALL_FEATURES if st.session_state.features.get(k) is not None])
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total Features", len(ALL_FEATURES))
+    c2.metric("Extracted", extracted_count)
+    c3.metric("Missing", len(missing))
+
+    with st.expander("View extracted feature data"):
+        st.json(st.session_state.features)
+
     if len(missing) > 0:
+        with st.container(border=True):
+            st.subheader("Step 2: Fill missing fields")
+            st.warning("Please fill the remaining fields before prediction.")
 
-        st.warning("Please fill missing fields:")
+            col_left, col_right = st.columns(2)
+            for i, field in enumerate(missing):
+                config = FIELD_CONFIG.get(field, {})
+                label = field
+                if config.get("unit"):
+                    label = f"{field} ({config['unit']})"
 
-        for field in missing:
-            config = FIELD_CONFIG.get(field, {})
-            label = field
-            if config.get("unit"):
-                label = f"{field} ({config['unit']})"
+                help_text = config.get("help", "")
+                example = config.get("example")
+                if example:
+                    help_text = f"{help_text} Example: {example}"
 
-            help_text = config.get("help", "")
-            example = config.get("example")
-            if example:
-                help_text = f"{help_text} Example: {example}"
+                target_col = col_left if i % 2 == 0 else col_right
+                with target_col:
+                    if field in OPTIONS:
+                        current = st.session_state.filled.get(field, OPTIONS[field][0])
+                        if current not in OPTIONS[field]:
+                            current = OPTIONS[field][0]
+                        st.session_state.filled[field] = st.selectbox(
+                            label,
+                            OPTIONS[field],
+                            index=OPTIONS[field].index(current),
+                            help=help_text,
+                            key=f"field_{field}",
+                        )
+                    elif config.get("widget") == "number":
+                        min_val = config.get("min", 0)
+                        max_val = config.get("max", 100000)
+                        step = config.get("step", 1)
+                        val_type = config.get("type", "float")
+                        current = st.session_state.filled.get(field)
+                        if current is None:
+                            current = config.get("example", min_val)
 
-            if field in OPTIONS:
-                st.session_state.filled[field] = st.selectbox(
-                    label,
-                    OPTIONS[field],
-                    help=help_text,
-                    key=f"field_{field}"
-                )
-            else:
-                input_help = help_text
-                if config.get("widget") == "number":
-                    input_help = f"Numeric input expected. {input_help}"
-                st.session_state.filled[field] = st.text_input(
-                    label,
-                    placeholder=example or "",
-                    help=input_help,
-                    key=f"field_{field}"
-                )
+                        if val_type == "int":
+                            st.session_state.filled[field] = st.number_input(
+                                label,
+                                min_value=int(min_val),
+                                max_value=int(max_val),
+                                value=int(float(current)),
+                                step=int(step),
+                                help=help_text,
+                                key=f"field_{field}",
+                            )
+                        else:
+                            st.session_state.filled[field] = st.number_input(
+                                label,
+                                min_value=float(min_val),
+                                max_value=float(max_val),
+                                value=float(current),
+                                step=float(step),
+                                help=help_text,
+                                key=f"field_{field}",
+                            )
+                    else:
+                        st.session_state.filled[field] = st.text_input(
+                            label,
+                            value=st.session_state.filled.get(field, ""),
+                            placeholder=example or "",
+                            help=help_text,
+                            key=f"field_{field}",
+                        )
+    else:
+        st.success("All required features are available. You can run prediction now.")
 
     # ------------------------
     # STEP 3: PREDICT
     # ------------------------
-    if st.button("Predict"):
+    st.subheader("Step 3: Predict")
+
+    if st.button("Predict Price", type="primary", use_container_width=True):
 
         final_features = {}
 
@@ -234,10 +311,20 @@ if st.session_state.features is not None:
         # ------------------------
         # CALL BACKEND
         # ------------------------
-        res = requests.post(
-            "http://127.0.0.1:8000/predict",
-            json=final_features
-        )
+        try:
+            with st.spinner("Running prediction..."):
+                res = requests.post(
+                    "http://127.0.0.1:8000/predict",
+                    json=final_features,
+                    timeout=25,
+                )
+        except requests.RequestException:
+            st.error("Could not connect to prediction service.")
+            st.stop()
+
+        if res.status_code != 200:
+            st.error("Prediction request failed.")
+            st.stop()
 
         result = res.json()
 
@@ -248,19 +335,31 @@ if st.session_state.features is not None:
             if price is None:
                 st.error("Prediction failed (check backend model input).")
             else:
-                st.success(f"💰 Predicted Price: {price}")
+                st.session_state.prediction = price
 
                 # ------------------------
                 # ANALYSIS
                 # ------------------------
-                analyze_res = requests.post(
-                    "http://127.0.0.1:8000/analyze",
-                    json={"features": final_features, "prediction": price}
-                )
+                try:
+                    analyze_res = requests.post(
+                        "http://127.0.0.1:8000/analyze",
+                        json={"features": final_features, "prediction": price},
+                        timeout=25,
+                    )
+                except requests.RequestException:
+                    analyze_res = None
 
-                if analyze_res.status_code == 200:
+                if analyze_res is not None and analyze_res.status_code == 200:
                     analysis_data = analyze_res.json()
-                    st.subheader("🏡 Analysis")
-                    st.write(analysis_data.get("analysis", "Analysis not available."))
+                    st.session_state.analysis = analysis_data.get("analysis", "Analysis not available.")
                 else:
-                    st.warning("Could not generate analysis.")
+                    st.session_state.analysis = "Could not generate analysis."
+
+    if st.session_state.prediction is not None:
+        st.subheader("💰 Predicted Price")
+        st.success(f"Estimated price: ${float(st.session_state.prediction):,.0f}")
+
+    if st.session_state.analysis:
+        with st.container(border=True):
+            st.subheader("🏡 Analysis")
+            st.write(st.session_state.analysis)
