@@ -1,5 +1,8 @@
 import streamlit as st
 import requests
+import os
+
+BASE_URL = os.getenv("FASTAPI_URL", "http://127.0.0.1:8000")
 
 st.set_page_config(page_title="House Price Predictor", page_icon="🏠", layout="wide")
 
@@ -154,7 +157,7 @@ if submit_extract:
         try:
             with st.spinner("Extracting features..."):
                 res = requests.post(
-                    "http://127.0.0.1:8000/extract",
+                    f"{BASE_URL}/extract",
                     json={"query": query},
                     timeout=25,
                 )
@@ -314,7 +317,7 @@ if st.session_state.features is not None:
         try:
             with st.spinner("Running prediction..."):
                 res = requests.post(
-                    "http://127.0.0.1:8000/predict",
+                    f"{BASE_URL}/predict",
                     json=final_features,
                     timeout=25,
                 )
@@ -342,7 +345,7 @@ if st.session_state.features is not None:
                 # ------------------------
                 try:
                     analyze_res = requests.post(
-                        "http://127.0.0.1:8000/analyze",
+                        f"{BASE_URL}/analyze",
                         json={"features": final_features, "prediction": price},
                         timeout=25,
                     )
