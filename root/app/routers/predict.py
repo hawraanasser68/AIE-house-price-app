@@ -7,7 +7,7 @@ router = APIRouter()
 
 @router.post("/predict")
 def predict(input_data: HouseFeatures):
-    features = input_data.dict()
+    features = input_data.model_dump()
 
     validation_result = validate_features(features)
 

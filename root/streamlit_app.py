@@ -304,7 +304,7 @@ if st.session_state.features is not None:
                 st.error(f"Invalid input for {k}: '{v}' is not a valid number. Please enter a number, e.g., {example}.")
                 st.stop()
 
-        # 🔥 HARD CHECK (no silent failure)
+        
         missing_after = [k for k in ALL_FEATURES if k not in final_features]
 
         if len(missing_after) > 0:

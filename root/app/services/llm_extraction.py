@@ -16,9 +16,7 @@ OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 
 gemini_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-# ======================
-# SYSTEM PROMPT
-# ======================
+
 FEATURES = [
     "OverallQual",
     "GrLivArea",
@@ -108,8 +106,8 @@ def _get_system_prompt(prompt_version: str) -> str:
 
 
 def _parse_json_response(text: str) -> dict:
-    cleaned = re.sub(r"```json|```", "", text or "").strip()
-    return json.loads(cleaned)
+    cleaned = re.sub(r"```json|```", "", text or "").strip() #remove markdown code fences like json ... 
+    return json.loads(cleaned) #convert the cleaned JSON string into a Python dict with json.loads(...)
 
 
 def _extract_with_gemini(user_text: str, system_prompt: str) -> dict:
@@ -169,7 +167,7 @@ def extract_features(user_text: str, prompt_version: str = "v1"):
                 "error": "All extraction providers failed",
                 "raw_output": " | ".join(errors),
             }
-
+    # used .get for the system not to crash if it hits a feature that doesnt exist in the parsed output, it will return None instead of crashing the app
     result = {feature: parsed.get(feature) for feature in FEATURES}
     result["missing_features"] = [feature for feature in FEATURES if result.get(feature) is None]
 

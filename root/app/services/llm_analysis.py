@@ -12,8 +12,8 @@ OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 gemini_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
 
-def _analysis_with_gemini(prompt: str) -> str:
-    if gemini_client is None:
+def _analysis_with_gemini(prompt: str):
+    if gemini_client is None: #check if client is initialized if not raise error
         raise RuntimeError("GEMINI_API_KEY is missing")
 
     response = gemini_client.models.generate_content(
@@ -23,15 +23,15 @@ def _analysis_with_gemini(prompt: str) -> str:
     return (response.text or "").strip()
 
 
-def _analysis_with_openai(prompt: str) -> str:
+def _analysis_with_openai(prompt: str) :
     if not OPENAI_API_KEY:
         raise RuntimeError("OPENAI_API_KEY is missing")
 
     response = requests.post(
         OPENAI_URL,
         headers={
-            "Authorization": f"Bearer {OPENAI_API_KEY}",
-            "Content-Type": "application/json",
+            "Authorization": f"Bearer {OPENAI_API_KEY}", #proves that app is allowed to use the API
+            "Content-Type": "application/json", #says the request body is JSON
         },
         json={
             "model": OPENAI_MODEL,
@@ -43,9 +43,11 @@ def _analysis_with_openai(prompt: str) -> str:
         },
         timeout=30,
     )
-    response.raise_for_status()
+    response.raise_for_status() #if status is error, raise an exception with the error details
     payload = response.json()
-    return payload["choices"][0]["message"]["content"].strip()
+    return payload["choices"][0]["message"]["content"].strip() #That line gets the actual text answer from OpenAI’s JSON response and returns it as a clean string.
+
+
 
 def generate_analysis(features: dict, prediction: float):
 
